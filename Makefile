@@ -1,15 +1,17 @@
 CC := gcc
+YACC := bison
+LEX := flex
 SRCD := src
 TSTD := tests
 BLDD := build
 BIND := bin
 INCD := include
-LIBD := lib
+
+MAIN  := $(BLDD)/main.o
 
 ALL_SRCF := $(shell find $(SRCD) -type f -name *.c)
-ALL_LIBF := $(shell find $(LIBD) -type f -name *.o)
 ALL_OBJF := $(patsubst $(SRCD)/%,$(BLDD)/%,$(ALL_SRCF:.c=.o))
-FUNC_FILES := $(filter-out build/main.o, $(ALL_OBJF))
+ALL_FUNCF := $(filter-out $(MAIN) $(AUX), $(ALL_OBJF))
 
 TEST_SRC := $(shell find $(TSTD) -type f -name *.c)
 
@@ -20,18 +22,15 @@ COLORF := -DCOLOR
 DFLAGS := -g -DDEBUG -DCOLOR
 PRINT_STAMENTS := -DERROR -DSUCCESS -DWARN -DINFO
 
-STD := -std=c99
 TEST_LIB := -lcriterion
-LIBS := -lm
+LIBS :=
 
-CFLAGS += $(STD)
-
-EXEC := sfmm
-TEST := $(EXEC)_tests
+EXEC := mush
+TEST_EXEC := $(EXEC)_tests
 
 .PHONY: clean all setup debug
 
-all: setup $(BIND)/$(EXEC) $(BIND)/$(TEST)
+all: setup $(BIND)/$(EXEC) $(BIND)/$(TEST_EXEC)
 
 debug: CFLAGS += $(DFLAGS) $(PRINT_STAMENTS) $(COLORF)
 debug: all
@@ -42,17 +41,21 @@ $(BIND):
 $(BLDD):
 	mkdir -p $(BLDD)
 
-$(BIND)/$(EXEC): $(ALL_OBJF) $(ALL_LIBF)
+$(BIND)/$(EXEC): $(BLDD)/mush.tab.o $(BLDD)/mush.lex.o $(ALL_OBJF)
 	$(CC) $^ -o $@ $(LIBS)
 
-$(BIND)/$(TEST): $(FUNC_FILES) $(TEST_SRC) $(ALL_LIBF)
-	$(CC) $(CFLAGS) $(INC) $(FUNC_FILES) $(TEST_SRC) $(ALL_LIBF) $(TEST_LIB) $(LIBS) -o $@
+$(BIND)/$(TEST_EXEC): $(ALL_FUNCF) $(BLDD)/mush.tab.o $(BLDD)/mush.lex.o $(TEST_SRC)
+	$(CC) $(CFLAGS) $(INC) $(ALL_FUNCF) $(TEST_SRC) $(TEST_LIB) $(LIBS) -o $@
 
-$(BLDD)/%.o: $(SRCD)/%.c
+$(BLDD)/%.o: $(SRCD)/%.c $(INCD)/$(EXEC).tab.h
 	$(CC) $(CFLAGS) $(INC) -c -o $@ $<
 
 clean:
 	rm -rf $(BLDD) $(BIND)
+
+# Cancel the implicit rule that is doing the wrong thing.
+%.c: %.y
+%.c: %.l
 
 .PRECIOUS: $(BLDD)/*.d
 -include $(BLDD)/*.d
